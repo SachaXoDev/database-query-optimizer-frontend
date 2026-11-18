@@ -188,3 +188,8 @@ npm run build
 ```bash
 npm run preview
 ```
+
+## 7. Ссылки на проект
+
+- [Демо фронтенда на GitHub Pages](https://sachaxodev.github.io/database-query-optimizer-frontend/) — статическая версия с демонстрационными данными.
+- [Репозиторий бэкенда (ветка `lab-5-frontend-react`)](https://github.com/SachaXoDev/Khodina_IU5-51B_Web_Labs_2026_Database_query_optimizer/tree/lab-5-frontend-react).
