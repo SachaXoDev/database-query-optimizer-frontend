@@ -1,5 +1,7 @@
 # React + TypeScript + Vite
 
+This branch also includes the [Tauri desktop catalog and CLIP image search](native-tauri/README.md), with its own setup and calibration commands. The desktop catalog requires a separately running backend with the guest CLIP candidate endpoint; the React frontend below remains standalone.
+
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
 Currently, two official plugins are available:
