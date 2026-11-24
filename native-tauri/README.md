@@ -2,7 +2,7 @@
 
 The app has two views: a guest catalog with paginated search, filters and thumbnails; and read-only index details. Image search is part of the catalog. There is no sign-in, editing, or upload to the server.
 
-The server is not part of this standalone frontend branch. Use the [course backend repository](https://github.com/SachaXoDev/Khodina_IU5-51B_Web_Labs_2026_Database_query_optimizer) with the guest CLIP-candidate changes from the local backend branch `extras/indexes` (also included in backend `extras/async-rotation`). Offline calibration does not need a backend.
+The server is not part of this standalone frontend branch. Use the [backend `extras/indexes` branch](https://github.com/SachaXoDev/Khodina_IU5-51B_Web_Labs_2026_Database_query_optimizer/tree/extras/indexes) for the guest CLIP-candidate endpoint. The endpoint is also available in [backend `extras/async-rotation`](https://github.com/SachaXoDev/Khodina_IU5-51B_Web_Labs_2026_Database_query_optimizer/tree/extras/async-rotation). Offline calibration does not need a backend.
 
 ## Run and package
 
