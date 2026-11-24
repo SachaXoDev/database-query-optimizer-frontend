@@ -1,197 +1,88 @@
-import React, { useState, useEffect } from 'react';
-import { useOutletContext, useSearchParams } from 'react-router-dom';
-import { AppOutletContext } from '../AppLayout';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate, useOutletContext } from 'react-router-dom';
+import type { AppOutletContext } from '../AppLayout';
+import { IndexPresentation } from '../components/IndexPresentation';
+import { PageState } from '../components/PageState';
+import { describeError, fetchFeed, positiveId } from '../modules/indexesApi';
+import type { FeedResult } from '../modules/indexesApi';
+import { detailPath, nextFeedPath, ROUTES } from '../Routes';
 
-const defaultImage = '/DefaultImage.jpg';
-const defaultVideo = '/DefaultVideo.mp4';
+type FeedState = { key: string } & ({ result: FeedResult } | { error: string });
 
-export const FeedPage: React.FC = () => {
-  const { cards, setCards } = useOutletContext<AppOutletContext>();
-  const [searchParams] = useSearchParams();
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isExpanded, setIsExpanded] = useState(false);
+export function FeedPage() {
+  const { key, search } = useLocation();
+  const navigate = useNavigate();
+  const { initializeFeed, readCurrentFeed, user } = useOutletContext<AppOutletContext>();
+  const [state, setState] = useState<FeedState | null>(null);
+  const clickKey = useRef<string | null>(null);
+  const navigationRequest = useRef<{ key: string; request: Promise<FeedResult> } | null>(null);
+  const params = new URLSearchParams(search);
+  const idParam = params.get('id');
+  const id = positiveId(idParam);
+  const next = params.get('next') === 'true';
 
-  // Синхронизируем начальный индекс ТОЛЬКО при смене URL параметра ?id=
-  const idParam = searchParams.get('id');
   useEffect(() => {
-    if (idParam && cards.length > 0) {
-      const targetIdx = cards.findIndex((item) => String(item.id) === idParam);
-      if (targetIdx !== -1) {
-        setCurrentIndex(targetIdx);
-      }
+    clickKey.current = null;
+    if (idParam !== null && id === undefined) return;
+
+    // A Next request changes the Redis cursor. Reuse it on StrictMode effect
+    // replay; don't retry it in response to a render or a fetch error.
+    if (navigationRequest.current?.key !== key) {
+      const request = next
+        ? initializeFeed().then(() => fetchFeed({ id, next: true }))
+        : id !== undefined
+          ? initializeFeed().then(() => fetchFeed({ id }))
+          : readCurrentFeed();
+      navigationRequest.current = { key, request };
     }
-  }, [idParam]);
+    let active = true;
+    navigationRequest.current.request.then((result) => {
+      if (active) setState({ key, result });
+    }).catch((error: unknown) => {
+      if (active) setState({ key, error: describeError(error) });
+    });
+    return () => { active = false; };
+  }, [id, idParam, initializeFeed, key, next, readCurrentFeed]);
 
-  useEffect(() => {
-    // При переключении карточки сбрасываем раскрытие
-    setIsExpanded(false);
-  }, [currentIndex]);
+  const currentState = state?.key === key ? state : null;
+  const result = currentState && 'result' in currentState ? currentState.result : null;
+  const current = result?.current;
 
-  const currentItem = cards[currentIndex];
+  function advance() {
+    if (clickKey.current === key) return;
+    clickKey.current = key;
+    // Only send the guard for the cursor card, not for an explicit by-ID view.
+    navigate(nextFeedPath(id !== undefined && !next ? undefined : current?.id));
+  }
 
-  const handleNext = () => {
-    if (!cards.length) return;
-    setCurrentIndex((prev) => (prev + 1) % cards.length); // Циклический переход
-  };
-
-  const handleLike = () => {
-    if (!currentItem) return;
-    const nextIsLiked = currentItem.isLiked === 1 ? 0 : 1;
-    const nextLikes = currentItem.likesCount + (nextIsLiked === 1 ? 1 : -1);
-
-    setCards((prev) =>
-      prev.map((item) =>
-        item.id === currentItem.id
-          ? { ...item, isLiked: nextIsLiked, likesCount: nextLikes }
-          : item
-      )
-    );
-  };
-
-  if (!currentItem) {
+  if (idParam !== null && id === undefined) {
+    return <PageState error><p>Некорректный ID индекса.</p><Link to={ROUTES.FEED}>К началу ленты</Link></PageState>;
+  }
+  if (currentState && 'error' in currentState) {
+    return <PageState error><p>{currentState.error}</p><Link to={ROUTES.FEED}>Проверить текущую карточку</Link></PageState>;
+  }
+  if (!result) return <PageState><p role="status">Загрузка ленты…</p></PageState>;
+  if (!current) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#fff' }}>
-        Список услуг пуст
-      </div>
+      <PageState>
+        <p>{result.batchSize > 0 || (id !== undefined && !next) ? 'Индекс больше недоступен.' : 'В ленте пока нет опубликованных индексов.'}</p>
+        {result.batchSize > 0 && <button type="button" onClick={advance}>Далее</button>}
+        <Link to={ROUTES.FEED}>Обновить ленту</Link>
+        <Link to={ROUTES.LIST}>Открыть каталог</Link>
+      </PageState>
     );
   }
 
-  const isLiked = currentItem.isLiked === 1;
-
   return (
-    <div className="vibes-feed-container">
-      {/* Медиа-слой (видео или обложка) */}
-      <div className="vibes-media-layer">
-        {currentItem.videoUrl ? (
-          <video
-            key={currentItem.videoUrl}
-            className="vibes-video-bg"
-            src={currentItem.videoUrl}
-            autoPlay
-            loop
-            muted
-            playsInline
-            onError={(e) => {
-              (e.target as HTMLVideoElement).src = defaultVideo;
-            }}
-          />
-        ) : currentItem.imageUrl ? (
-          <img
-            className="vibes-video-bg"
-            src={currentItem.imageUrl}
-            alt={currentItem.indexName}
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = defaultImage;
-            }}
-          />
-        ) : (
-          <video
-            key="fallback-video"
-            className="vibes-video-bg"
-            src={defaultVideo}
-            autoPlay
-            loop
-            muted
-            playsInline
-          />
-        )}
-        <div className="vibes-gradient-overlay"></div>
-      </div>
-
-      {/* Верхний статус-бар Vibes: только бренд с live-dot (без 1/8 по требованию) */}
-      <div className="vibes-top-bar">
-        <div className="vibes-brand">
-          <span className="live-dot"></span>
-          <span className="brand-logo-text">DB OPTIMIZER</span>
-        </div>
-      </div>
-
-      {/* Боковая панель действий и параметров Vibes (справа) - 1-в-1 из ЛР-2 */}
-      <div className="vibes-sidebar-actions">
-        {/* Кнопка лайка */}
-        <button className="vibes-action-btn" onClick={handleLike} title="Лайк">
-          <div className="action-icon-circle">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill={isLiked ? '#1fdc6f' : 'none'}
-              stroke={isLiked ? '#1fdc6f' : '#ffffff'}
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-            </svg>
-          </div>
-          <span className="action-count">{currentItem.likesCount}</span>
-        </button>
-
-        {/* Кнопка перехода к следующему индексу (Далее) */}
-        <button className="vibes-action-btn" onClick={handleNext} title="Следующий индекс">
-          <div className="action-icon-circle next-circle">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#ffffff"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <polyline points="19 12 12 19 5 12" />
-            </svg>
-          </div>
-          <span className="action-count next-label">Далее</span>
-        </button>
-
-        {/* Параметр 1: CARDINALITY (как в ЛР-2) */}
-        <div className="vibes-side-metric" title="Мощность индекса (Cardinality)">
-          <span className="side-metric-label">CARDINALITY</span>
-          <span className="side-metric-val">{currentItem.cardinality}</span>
-        </div>
-
-        {/* Параметр 2: ВРЕМЯ (как в ЛР-2) */}
-        <div className="vibes-side-metric" title="Оценочное время создания">
-          <span className="side-metric-label">ВРЕМЯ</span>
-          <span className="side-metric-val">~{currentItem.estimatedCreationTimeSec}s</span>
-        </div>
-      </div>
-
-      {/* Нижний информационный оверлей Vibes (поверх видео) - 1-в-1 из ЛР-2 */}
-      <div className="vibes-bottom-overlay">
-        {/* Теги типа индекса и таблицы */}
-        <div className="vibes-tags-row">
-          <span className="vibes-type-pill">{currentItem.indexType} Index</span>
-          <span className="vibes-table-pill">
-            {currentItem.tableName}.{currentItem.columnName}
-          </span>
-        </div>
-
-        {/* Название индекса */}
-        <h2 className="vibes-title">{currentItem.indexName}</h2>
-
-        {/* Текстовое описание: свернуть / развернуть (больше / меньше) */}
-        <div className="vibes-desc-wrapper">
-          <p className={`vibes-desc-text ${isExpanded ? 'expanded' : 'collapsed'}`}>
-            {currentItem.fullDescription || currentItem.shortDescription}
-          </p>
-
-          <button
-            type="button"
-            className="desc-toggle-btn"
-            onClick={() => setIsExpanded(!isExpanded)}
-          >
-            {isExpanded ? 'меньше' : 'больше'}
-          </button>
-        </div>
-      </div>
-    </div>
+    <IndexPresentation
+      key={current.id}
+      item={current}
+      user={user}
+      top={<><span className="live-dot" /><span className="brand-logo-text">DB OPTIMIZER</span></>}
+      onNext={advance}
+      detailsTo={detailPath(current.id)}
+      onUpdated={(item) => setState({ key, result: { ...result, current: item } })}
+      onDeleted={() => navigate(ROUTES.FEED, { replace: true })}
+    />
   );
-};
-
-export default FeedPage;
+}

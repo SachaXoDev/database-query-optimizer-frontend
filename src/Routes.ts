@@ -1,14 +1,16 @@
 export const ROUTES = {
-  LIST: '/',          // Плитка списка услуг с фильтром
-  FEED: '/feed',      // Лента (Feed)
-  DETAIL: '/detail',  // Подробнее (/detail/:id)
-  CREATE: '/create',  // Добавление (недоступно гостю в ЛР5)
-  LOGIN: '/login',    // Вход (недоступно гостю в ЛР5)
-};
+  LIST: '/',
+  FEED: '/feed',
+  DETAIL: '/detail',
+  CREATE: '/create',
+  LOGIN: '/login',
+  REGISTER: '/register',
+} as const;
 
-export const ROUTE_LABELS = {
-  LIST: 'Плитка',
-  FEED: 'Лента',
-  CREATE: 'Добавление',
-  LOGIN: 'Вход',
-};
+export const detailPath = (id: number) => `${ROUTES.DETAIL}/${id}`;
+
+export function nextFeedPath(id?: number): string {
+  const query = new URLSearchParams({ next: 'true' });
+  if (id !== undefined) query.set('id', String(id));
+  return `${ROUTES.FEED}?${query}`;
+}

@@ -3,23 +3,24 @@ import { AppLayout } from './AppLayout';
 import { ListPage } from './pages/ListPage';
 import { FeedPage } from './pages/FeedPage';
 import { DetailPage } from './pages/DetailPage';
+import { AuthPage } from './pages/AuthPage';
+import { CreatePage } from './pages/CreatePage';
 import { ROUTES } from './Routes';
 
-export function App() {
+export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route element={<AppLayout />}>
-          {/* Страница 1: Плитка списка услуг с фильтрацией */}
           <Route path={ROUTES.LIST} element={<ListPage />} />
-          {/* Страница 2: Лента услуг (Feed) */}
           <Route path={ROUTES.FEED} element={<FeedPage />} />
-          {/* Страница 3: Подробнее (Detail) */}
           <Route path={`${ROUTES.DETAIL}/:id`} element={<DetailPage />} />
+          <Route path={ROUTES.CREATE} element={<CreatePage />} />
+          <Route path={ROUTES.LOGIN} element={<AuthPage key="login" mode="login" />} />
+          <Route path={ROUTES.REGISTER} element={<AuthPage key="register" mode="register" />} />
+          <Route path="*" element={<main className="page-state"><p>Страница не найдена.</p></main>} />
         </Route>
       </Routes>
     </BrowserRouter>
   );
 }
-
-export default App;
