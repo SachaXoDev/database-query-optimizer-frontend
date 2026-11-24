@@ -3,7 +3,7 @@ import type { FormEvent } from 'react';
 import { Link, useNavigate, useOutletContext } from 'react-router-dom';
 import type { AppOutletContext } from '../AppLayout';
 import { PageState } from '../components/PageState';
-import { ApiError, describeError, fetchDraft, publishIndex, saveDraft } from '../modules/indexesApi';
+import { ApiError, describeError, fetchDraft, mediaUrl, publishIndex, saveDraft } from '../modules/indexesApi';
 import type { IndexItem } from '../modules/indexesApi';
 import { detailPath, ROUTES } from '../Routes';
 
@@ -62,19 +62,29 @@ function DraftEditor({ onSessionExpired }: { onSessionExpired: () => void }) {
     }
     fields.set('indexName', name);
     if (fields.get('cardinality') === '') fields.delete('cardinality');
-    const image = fields.get('image');
-    if (!(image instanceof File) || image.name === '') {
-      fields.delete('image');
-    } else if (image.size > maxFileSize) {
-      setError('Размер изображения не должен превышать 50 МиБ.');
-      return;
+    for (const field of ['image', 'model']) {
+      const file = fields.get(field);
+      if (!(file instanceof File) || file.name === '') {
+        fields.delete(field);
+        continue;
+      }
+      if (file.size > maxFileSize) {
+        setError('Размер каждого файла не должен превышать 50 МиБ.');
+        return;
+      }
+      if (field === 'model' && !/\.glb$/i.test(file.name)) {
+        setError('Выберите 3D-модель в формате .glb.');
+        return;
+      }
     }
     setBusy(true);
     try {
       const saved = await saveDraft(fields);
       setDraft(saved);
-      const input = form.elements.namedItem('image');
-      if (input instanceof HTMLInputElement) input.value = '';
+      for (const field of ['image', 'model']) {
+        const input = form.elements.namedItem(field);
+        if (input instanceof HTMLInputElement) input.value = '';
+      }
       if (publish) {
         const published = await publishIndex(saved.id);
         if (!active.current) return;
@@ -111,7 +121,9 @@ function DraftEditor({ onSessionExpired }: { onSessionExpired: () => void }) {
             <label>Краткое описание<input name="shortDescription" defaultValue={draft?.shortDescription} /></label>
             <label>Полное описание<textarea name="fullDescription" rows={4} defaultValue={draft?.fullDescription} /></label>
             <label>Изображение<input name="image" type="file" accept="image/jpeg,image/png,image/webp,image/svg+xml" /></label>
-            <small>Изображение необязательно. Не более 50 МиБ.</small>
+            <label>3D-модель (.glb)<input name="model" type="file" accept=".glb,model/gltf-binary" /></label>
+            <small>Изображение и модель необязательны. Не более 50 МиБ на файл.</small>
+            {draft?.modelUrl && <a href={mediaUrl(draft.modelUrl)} target="_blank" rel="noreferrer">Сохранённый .glb</a>}
             <div className="extras-form-actions">
               <button type="submit" value="draft">Сохранить черновик</button>
               <button type="submit" className="primary-action" value="publish">Опубликовать</button>

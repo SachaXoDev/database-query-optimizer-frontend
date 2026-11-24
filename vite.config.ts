@@ -5,6 +5,7 @@ const backend = process.env.API_PROXY_TARGET || 'http://127.0.0.1:3108';
 const proxy = {
   '/api': { target: backend, changeOrigin: true },
   '^/assets/default_index\\.svg(?:\\?|$)': { target: backend, changeOrigin: true },
+  '^/assets/demo-index-model\\.glb(?:\\?|$)': { target: backend, changeOrigin: true },
   '/media': { target: backend, changeOrigin: true },
 };
 

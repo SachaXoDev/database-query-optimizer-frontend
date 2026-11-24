@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import type { AppOutletContext } from '../AppLayout';
 import { IndexPresentation } from '../components/IndexPresentation';
 import { PageState } from '../components/PageState';
 import { describeError, fetchFeed, positiveId } from '../modules/indexesApi';
 import type { FeedResult } from '../modules/indexesApi';
+import { useIndexPolling } from '../modules/useIndexPolling';
 import { detailPath, nextFeedPath, ROUTES } from '../Routes';
 
 type FeedState = { key: string } & ({ result: FeedResult } | { error: string });
@@ -14,6 +15,8 @@ export function FeedPage() {
   const navigate = useNavigate();
   const { initializeFeed, readCurrentFeed, user } = useOutletContext<AppOutletContext>();
   const [state, setState] = useState<FeedState | null>(null);
+  const [pollError, setPollError] = useState<string | null>(null);
+  const [mutating, setMutating] = useState(false);
   const clickKey = useRef<string | null>(null);
   const navigationRequest = useRef<{ key: string; request: Promise<FeedResult> } | null>(null);
   const params = new URLSearchParams(search);
@@ -23,10 +26,12 @@ export function FeedPage() {
 
   useEffect(() => {
     clickKey.current = null;
+    setPollError(null);
+    setMutating(false);
     if (idParam !== null && id === undefined) return;
 
     // A Next request changes the Redis cursor. Reuse it on StrictMode effect
-    // replay; don't retry it in response to a render or a fetch error.
+    // replay; don't retry it in response to a render, a poll, or a fetch error.
     if (navigationRequest.current?.key !== key) {
       const request = next
         ? initializeFeed().then(() => fetchFeed({ id, next: true }))
@@ -47,6 +52,11 @@ export function FeedPage() {
   const currentState = state?.key === key ? state : null;
   const result = currentState && 'result' in currentState ? currentState.result : null;
   const current = result?.current;
+  const updateFromPoll = useCallback((polled: FeedResult) => {
+    setState({ key, result: polled });
+    setPollError(null);
+  }, [key]);
+  useIndexPolling(mutating ? undefined : current?.id, updateFromPoll, setPollError);
 
   function advance() {
     if (clickKey.current === key) return;
@@ -81,6 +91,8 @@ export function FeedPage() {
       top={<><span className="live-dot" /><span className="brand-logo-text">DB OPTIMIZER</span></>}
       onNext={advance}
       detailsTo={detailPath(current.id)}
+      pollError={pollError}
+      onMutation={setMutating}
       onUpdated={(item) => setState({ key, result: { ...result, current: item } })}
       onDeleted={() => navigate(ROUTES.FEED, { replace: true })}
     />

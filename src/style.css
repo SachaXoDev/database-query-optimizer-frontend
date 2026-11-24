@@ -833,7 +833,16 @@ input.form-range.cardinality-range-slider:focus::-webkit-slider-thumb {
   margin: 12px 0;
 }
 
-.vibes-notice {
+.model-preview-canvas {
+  position: absolute;
+  inset: 10% 8% 35%;
+  visibility: hidden;
+}
+.model-preview-canvas.is-ready { visibility: visible; }
+.model-preview-canvas canvas { display: block; }
+.vibes-media-layer:has(.model-preview-canvas.is-ready) { background: radial-gradient(ellipse at 50% 34%, #3b4e51, #11171a 65%); }
+.vibes-media-layer:has(.model-preview-canvas.is-ready) .vibes-cover { opacity: 0; }
+.model-status, .vibes-notice {
   position: absolute;
   left: 14px;
   right: 14px;
@@ -844,6 +853,7 @@ input.form-range.cardinality-range-slider:focus::-webkit-slider-thumb {
   background: rgba(13, 14, 16, .85);
   font-size: 13px;
 }
+.model-status { top: 40%; text-align: center; }
 .vibes-notice { top: 52px; }
 .vibes-title { overflow-wrap: anywhere; }
 .vibes-desc-text.expanded { max-height: 22vh; overflow: auto; }

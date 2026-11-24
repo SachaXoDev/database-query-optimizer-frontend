@@ -11,6 +11,9 @@ export interface IndexItem {
   indexType: string;
   cardinality: number;
   imageUrl: string | null;
+  modelUrl: string | null;
+  rotationX: number;
+  rotationY: number;
   likesCount: number;
   isLiked: number;
   isOwner: number;
@@ -75,7 +78,7 @@ export function mediaUrl(url: string): string {
   return new URL(url, `${apiOrigin || window.location.origin}/`).href;
 }
 
-// Signed URLs can change while still pointing to the same stored object.
+// MinIO changes the signature on every poll; the object key changes only on replacement.
 export function mediaIdentity(url: string): string {
   const parsed = new URL(url);
   return parsed.searchParams.has('X-Amz-Signature') ? `${parsed.origin}${parsed.pathname}` : url;

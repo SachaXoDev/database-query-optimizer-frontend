@@ -1,21 +1,25 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { deleteIndex, describeError, toggleIndexLike } from '../modules/indexesApi';
+import { deleteIndex, describeError, mediaIdentity, mediaUrl, toggleIndexLike } from '../modules/indexesApi';
 import type { IndexItem, SessionUser } from '../modules/indexesApi';
 import { IndexImage } from './IndexImage';
+
+const ModelPreview = lazy(() => import('./ModelPreview'));
 
 interface Props {
   item: IndexItem;
   user: SessionUser | null;
   top: ReactNode;
+  pollError: string | null;
   onNext?: () => void;
   detailsTo?: string;
+  onMutation: (busy: boolean) => void;
   onUpdated: (item: IndexItem) => void;
   onDeleted: () => void;
 }
 
-export function IndexPresentation({ item, user, top, onNext, detailsTo, onUpdated, onDeleted }: Props) {
+export function IndexPresentation({ item, user, top, pollError, onNext, detailsTo, onMutation, onUpdated, onDeleted }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +33,7 @@ export function IndexPresentation({ item, user, top, onNext, detailsTo, onUpdate
     if (busy || (remove && !window.confirm(`Удалить индекс «${item.indexName}»?`))) return;
     setBusy(true);
     setError(null);
+    onMutation(true);
     try {
       if (remove) {
         await deleteIndex(item.id);
@@ -40,19 +45,30 @@ export function IndexPresentation({ item, user, top, onNext, detailsTo, onUpdate
     } catch (requestError) {
       if (active.current) setError(describeError(requestError));
     } finally {
-      if (active.current) setBusy(false);
+      if (active.current) {
+        setBusy(false);
+        onMutation(false);
+      }
     }
   };
 
   const description = item.fullDescription || item.shortDescription;
+  const model = item.modelUrl ? mediaUrl(item.modelUrl) : null;
   return (
     <main className="vibes-feed-container">
       <div className="vibes-media-layer">
         <IndexImage url={item.imageUrl} name={`Обложка: ${item.indexName}`} className="vibes-cover" />
+        {model && (
+          <Suspense fallback={<p className="model-status" role="status">Загрузка 3D-модели…</p>}>
+            <ModelPreview key={mediaIdentity(model)} url={model} name={item.indexName} rotationX={item.rotationX} rotationY={item.rotationY} />
+          </Suspense>
+        )}
         <div className="vibes-gradient-overlay" />
       </div>
       <div className="vibes-top-bar"><div className="vibes-brand">{top}</div></div>
-      {error && <p className="vibes-notice" role="alert">{error}</p>}
+      {(error || pollError) && (
+        <p className="vibes-notice" role={error ? 'alert' : 'status'}>{error || `Данные не обновились: ${pollError}`}</p>
+      )}
       <aside className="vibes-sidebar-actions" aria-label="Действия и параметры">
         {user ? (
           <button type="button" className="vibes-action-btn" aria-label={`Нравится: ${item.likesCount}`} aria-pressed={item.isLiked === 1} disabled={busy} onClick={() => void action(false)}>
